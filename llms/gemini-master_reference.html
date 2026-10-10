@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Chosen Palette: Dark Developer Slate (Background: #0B0F17, Panel: #161B22, Card: #1F2937, Accent Indigo: #6366F1, Accent Cyan: #06B6D4, Accent Emerald: #10B981) -->
+    <!-- Application Structure Plan: The application is designed as a dual-panel interactive master reference engine. The left panel renders clean, production-grade PyTorch code blocks for each core LLM module. The right panel displays live interactive visualizers, tensor math engines, memory estimators, and attention simulators. Contextual introductory headers and interactive controls allow users to explore LLM internals step-by-step from raw text preprocessing to autoregressive KV-cached deployment. -->
+    <!-- Visualization & Content Choices: 
+        1. Tokenization & Windowing: Dynamic JS sliding window simulator with text-to-token integer offset displays.
+        2. RoPE Embeddings: HTML5 Canvas 2D complex plane unit circle showing vector rotation dynamics and relative positional decay.
+        3. GQA & FlashAttention: Interactive head mapping topology + dynamic HTML Canvas heatmap rendering attention scores without full matrix allocation.
+        4. SwiGLU & RMSNorm: Interactive distribution function curve and computational graph compare tool.
+        5. GPU VRAM Profiler: Chart.js dynamic breakdown of Weights, Gradients, AdamW FP32 states, and KV-Cache based on model hyperparameters.
+        6. KV Cache Decoder: Step-by-step token generator simulator tracking memory buffer updates during autoregressive inference.
+        - NO SVG or Mermaid JS used. All graphics utilize Chart.js canvas or HTML5 Canvas API. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Architecture & Training Master Workbench</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0B0F17',
+                            panel: '#161B22',
+                            card: '#1F2937',
+                            border: '#374151',
+                            indigo: '#6366F1',
+                            cyan: '#06B6D4',
+                            emerald: '#10B981',
+                            amber: '#F59E0B',
+                            rose: '#F43F5E'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['Fira Code', 'JetBrains Mono', 'monospace'],
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0B0F17;
+            color: #E5E7EB;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+        }
+        
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4B5563;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 280px;
+            max-height: 320px;
+        }
+
+        .code-syntax-keyword { color: #F43F5E; font-weight: 600; }
+        .code-syntax-func { color: #D8B4FE; }
+        .code-syntax-comment { color: #6B7280; font-style: italic; }
+        .code-syntax-class { color: #38BDF8; font-weight: 600; }
+        .code-syntax-string { color: #34D399; }
+        .code-syntax-number { color: #FBBF24; }
+
+        .active-tab {
+            border-left: 3px solid #6366F1;
+            background-color: #1F2937;
+            color: #818CF8;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-brand-panel border-b border-brand-border h-14 flex items-center justify-between px-5 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                λ
+            </div>
+            <div>
+                <h1 class="text-sm font-bold text-white tracking-wide uppercase">LLM Architecture & Systems Engineering Reference</h1>
+                <p class="text-xs text-gray-4 text-gray-400">Interactive Code, Tensor Visualizer & GPU Memory Engine</p>
+            </div>
+        </div>
+
+        <!-- Global Status Bar -->
+        <div class="hidden md:flex items-center space-x-6 text-xs text-gray-300">
+            <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-mono text-gray-400">Target: <span class="text-emerald-400 font-semibold">LLaMA-3 Architecture Spec</span></span>
+            </div>
+            <div class="bg-brand-card px-3 py-1 rounded border border-brand-border font-mono text-cyan-400">
+                Precision: bfloat16
+            </div>
+            <button onclick="copyMasterPrompt()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-medium transition flex items-center space-x-1">
+                <span>📋 Copy Master Prompt</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Module Navigation Sidebar -->
+        <aside class="w-64 bg-brand-panel border-r border-brand-border flex flex-col shrink-0 select-none">
+            <div class="p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-brand-border">
+                Architecture Pipeline
+            </div>
+            <nav class="flex-1 overflow-y-auto p-2 space-y-1 text-sm font-medium">
+                <button onclick="selectModule(0)" id="nav-btn-0" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 active-tab">
+                    <span class="font-mono text-xs text-indigo-400">01.</span>
+                    <span class="truncate">Text Cleaning & Tokenization</span>
+                </button>
+                <button onclick="selectModule(1)" id="nav-btn-1" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-cyan-400">02.</span>
+                    <span class="truncate">Embeddings & RoPE Math</span>
+                </button>
+                <button onclick="selectModule(2)" id="nav-btn-2" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-emerald-400">03.</span>
+                    <span class="truncate">RMSNorm & SwiGLU FFN</span>
+                </button>
+                <button onclick="selectModule(3)" id="nav-btn-3" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-amber-400">04.</span>
+                    <span class="truncate">GQA & FlashAttention-2</span>
+                </button>
+                <button onclick="selectModule(4)" id="nav-btn-4" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-rose-400">05.</span>
+                    <span class="truncate">Loss, Autograd & GPU VRAM</span>
+                </button>
+                <button onclick="selectModule(5)" id="nav-btn-5" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-indigo-400">06.</span>
+                    <span class="truncate">Persistence & KV Cache Inference</span>
+                </button>
+                <button onclick="selectModule(6)" id="nav-btn-6" class="w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card">
+                    <span class="font-mono text-xs text-cyan-400">07.</span>
+                    <span class="truncate">Full Transformer Assembly</span>
+                </button>
+            </nav>
+
+            <!-- Quick Specs Info Card -->
+            <div class="p-3 m-2 bg-brand-card border border-brand-border rounded-lg text-xs space-y-1">
+                <div class="font-semibold text-gray-300">Model Reference Dimensions</div>
+                <div class="flex justify-between text-gray-400"><span>Vocabulary Size:</span> <span class="font-mono text-indigo-400">32,000</span></div>
+                <div class="flex justify-between text-gray-400"><span>Hidden Dim ($d_{model}$):</span> <span class="font-mono text-indigo-400">4,096</span></div>
+                <div class="flex justify-between text-gray-400"><span>Layers:</span> <span class="font-mono text-indigo-400">32</span></div>
+                <div class="flex justify-between text-gray-400"><span>Query / KV Heads:</span> <span class="font-mono text-indigo-400">32 / 8 (GQA)</span></div>
+            </div>
+        </aside>
+
+        <!-- Center / Left Code Panel -->
+        <main class="w-1/2 bg-brand-bg border-r border-brand-border flex flex-col overflow-hidden">
+            <div class="h-10 bg-brand-panel border-b border-brand-border px-4 flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-2 text-gray-300 font-mono">
+                    <span class="text-indigo-400 font-bold">PyTorch Implementation</span>
+                    <span id="code-filepath-label" class="text-gray-500">/src/model/tokenizer_data.py</span>
+                </div>
+                <button onclick="copyCodeBlock()" class="text-gray-400 hover:text-white transition flex items-center space-x-1">
+                    <span class="font-mono text-xs">Copy Code</span>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed" id="code-container">
+                <!-- Python Code Rendered Here Dynamically -->
+            </div>
+        </main>
+
+        <!-- Right Visual & Mathematical Interactive Panel -->
+        <section class="w-1/2 bg-brand-panel flex flex-col overflow-y-auto p-5 space-y-5">
+            
+            <!-- Dynamic Section Header -->
+            <div class="border-b border-brand-border pb-3">
+                <div class="flex items-center justify-between">
+                    <span id="section-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-900/60 text-indigo-300 border border-indigo-700/50">
+                        Module 01
+                    </span>
+                    <span id="section-tensor-shape" class="text-xs font-mono text-cyan-400">
+                        Tensor Input: [Batch, Seq_Len]
+                    </span>
+                </div>
+                <h2 id="section-title" class="text-xl font-bold text-white mt-2">
+                    Text Processing & Token Window Sampling
+                </h2>
+                <p id="section-desc" class="text-xs text-gray-400 mt-1 leading-relaxed">
+                    This module prepares unstructured continuous text corpora into high-dimensional integer sequences. It normalizes text, parses bytes using subword tokenization, and formats offset Context ($X$) and Target ($Y$) window matrices for causal cross-entropy optimization.
+                </p>
+            </div>
+
+            <!-- Dynamic Workbench Container (Visualizers & Math Tools) -->
+            <div id="visual-workbench" class="space-y-4">
+                <!-- Content Injected Dynamically Based on Active Module -->
+            </div>
+
+        </section>
+
+    </div>
+
+    <!-- Master System Prompt Modal -->
+    <div id="prompt-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-6 z-50">
+        <div class="bg-brand-panel border border-brand-border rounded-xl w-full max-w-3xl flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <span>🚀 AI Master Developer System Prompt</span>
+                </h3>
+                <button onclick="togglePromptModal(false)" class="text-gray-400 hover:text-white font-mono text-lg">&times;</button>
+            </div>
+            <div class="p-4 flex-1 overflow-y-auto font-mono text-xs bg-brand-bg text-gray-300 leading-relaxed whitespace-pre-wrap" id="prompt-text-container">
+<!-- Master Developer Prompt Output -->
+            </div>
+            <div class="p-3 border-t border-brand-border flex justify-end space-x-3 bg-brand-panel">
+                <button onclick="togglePromptModal(false)" class="px-4 py-1.5 rounded bg-brand-card hover:bg-gray-700 text-xs font-medium text-gray-300">Close</button>
+                <button onclick="copyMasterPromptText()" class="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs font-medium text-white">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic & Engine Script -->
+    <script>
+        // Global Code Base State
+        const moduleData = [
+            {
+                id: 0,
+                title: "Text Ingestion, Cleaning & Subword Tokenization",
+                filepath: "src/data/data_pipeline.py",
+                tensorShape: "X: [B, T] -> Y: [B, T]",
+                badge: "Data Preprocessing",
+                badgeClass: "bg-indigo-900/60 text-indigo-300 border-indigo-700/50",
+                desc: "LLMs require discrete integer token representations derived from subword tokenizers (e.g., Byte-Pair Encoding). Natural language is chunked into contextual sequences (X) and target sequences (Y) strictly offset by 1 position for next-token probability learning.",
+                code: `<span class="code-syntax-keyword">import</span> torch
+<span class="code-syntax-keyword">import</span> re
+
+<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">LLMDatasetPrep</span>:
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, raw_text: <span class="code-syntax-class">str</span>, block_size: <span class="code-syntax-class">int</span>):
+        self.block_size = block_size
+        self.cleaned_text = self.<span class="code-syntax-func">clean_corpus</span>(raw_text)
+        
+        <span class="code-syntax-comment"># Build character/subword vocabulary mapping</span>
+        self.chars = <span class="code-syntax-class">sorted</span>(<span class="code-syntax-class">list</span>(<span class="code-syntax-class">set</span>(self.cleaned_text)))
+        self.vocab_size = <span class="code-syntax-class">len</span>(self.chars)
+        self.stoi = {ch: i <span class="code-syntax-keyword">for</span> i, ch <span class="code-syntax-keyword">in</span> <span class="code-syntax-class">enumerate</span>(self.chars)}
+        self.itos = {i: ch <span class="code-syntax-keyword">for</span> i, ch <span class="code-syntax-keyword">in</span> <span class="code-syntax-class">enumerate</span>(self.chars)}
+        
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">clean_corpus</span>(self, text: <span class="code-syntax-class">str</span>) -> <span class="code-syntax-class">str</span>:
+        <span class="code-syntax-comment"># Strip unnecessary unicode whitespace & metadata</span>
+        text = re.<span class="code-syntax-func">sub</span>(<span class="code-syntax-string">r'\s+'</span>, <span class="code-syntax-string">' '</span>, text)
+        <span class="code-syntax-keyword">return</span> text.<span class="code-syntax-func">strip</span>()
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">encode</span>(self, s: <span class="code-syntax-class">str</span>) -> torch.Tensor:
+        <span class="code-syntax-keyword">return</span> torch.<span class="code-syntax-func">tensor</span>([self.stoi[c] <span class="code-syntax-keyword">for</span> c <span class="code-syntax-keyword">in</span> s], dtype=torch.long)
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">get_batch</span>(self, data_tensor: torch.Tensor, batch_size: <span class="code-syntax-class">int</span>):
+        <span class="code-syntax-comment"># Randomly sample context windows across the token array</span>
+        ix = torch.<span class="code-syntax-func">randint</span>(<span class="code-syntax-class">len</span>(data_tensor) - self.block_size, (batch_size,))
+        
+        <span class="code-syntax-comment"># X: Context sequence; Y: Target sequence offset by 1 step</span>
+        x = torch.<span class="code-syntax-func">stack</span>([data_tensor[i : i + self.block_size] <span class="code-syntax-keyword">for</span> i <span class="code-syntax-keyword">in</span> ix])
+        y = torch.<span class="code-syntax-func">stack</span>([data_tensor[i + <span class="code-syntax-number">1</span> : i + self.block_size + <span class="code-syntax-number">1</span>] <span class="code-syntax-keyword">for</span> i <span class="code-syntax-keyword">in</span> ix])
+        <span class="code-syntax-keyword">return</span> x, y`
+            },
+            {
+                id: 1,
+                title: "Embeddings & Rotary Positional Encoding (RoPE)",
+                filepath: "src/model/embeddings.py",
+                tensorShape: "x: [B, T, D] -> freqs_cis: [T, D_head/2]",
+                badge: "Mathematical Encoding",
+                badgeClass: "bg-cyan-900/60 text-cyan-300 border-cyan-700/50",
+                desc: "Transformers process sequences as unordered sets. Rotary Position Embeddings (RoPE) encode token positions by multiplying Query and Key representations by a complex rotation matrix. The inner product between rotated vectors explicitly decays as a function of relative temporal distance.",
+                code: `<span class="code-syntax-keyword">import</span> torch
+<span class="code-syntax-keyword">import</span> torch.nn <span class="code-syntax-keyword">as</span> nn
+
+<span class="code-syntax-keyword">def</span> <span class="code-syntax-func">precompute_freqs_cis</span>(dim: <span class="code-syntax-class">int</span>, end: <span class="code-syntax-class">int</span>, theta: <span class="code-syntax-class">float</span> = <span class="code-syntax-number">10000.0</span>):
+    <span class="code-syntax-comment"># Compute decaying theta parameters for head dimension pairs</span>
+    freqs = <span class="code-syntax-number">1.0</span> / (theta ** (torch.<span class="code-syntax-func">arange</span>(<span class="code-syntax-number">0</span>, dim, <span class="code-syntax-number">2</span>)[: (dim // <span class="code-syntax-number">2</span>)].<span class="code-syntax-func">float</span>() / dim))
+    t = torch.<span class="code-syntax-func">arange</span>(end, device=freqs.device)
+    
+    <span class="code-syntax-comment"># Outer product generates angle table [seq_len, dim/2]</span>
+    freqs = torch.<span class="code-syntax-func">outer</span>(t, freqs).<span class="code-syntax-func">float</span>()
+    
+    <span class="code-syntax-comment"># Convert to complex polar representation e^(i * theta)</span>
+    freqs_cis = torch.<span class="code-syntax-func">polar</span>(torch.<span class="code-syntax-func">ones_like</span>(freqs), freqs)
+    <span class="code-syntax-keyword">return</span> freqs_cis
+
+<span class="code-syntax-keyword">def</span> <span class="code-syntax-func">apply_rotary_emb</span>(xq: torch.Tensor, xk: torch.Tensor, freqs_cis: torch.Tensor):
+    <span class="code-syntax-comment"># Reshape [B, T, H, D] into complex pairs [B, T, H, D/2]</span>
+    xq_complex = torch.<span class="code-syntax-func">view_as_complex</span>(xq.<span class="code-syntax-func">float</span>().<span class="code-syntax-func">reshape</span>(*xq.shape[:-<span class="code-syntax-number">1</span>], -<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>))
+    xk_complex = torch.<span class="code-syntax-func">view_as_complex</span>(xk.<span class="code-syntax-func">float</span>().<span class="code-syntax-func">reshape</span>(*xk.shape[:-<span class="code-syntax-number">1</span>], -<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>))
+    
+    <span class="code-syntax-comment"># Reshape complex angles for broadcasting</span>
+    freqs_cis = freqs_cis[:xq.shape[<span class="code-syntax-number">1</span>]].<span class="code-syntax-func">unsqueeze</span>(<span class="code-syntax-number">0</span>).<span class="code-syntax-func">unsqueeze</span>(<span class="code-syntax-number">2</span>)
+    
+    <span class="code-syntax-comment"># Rotate representations via complex multiplication</span>
+    xq_out = torch.<span class="code-syntax-func">view_as_real</span>(xq_complex * freqs_cis).<span class="code-syntax-func">flatten</span>(<span class="code-syntax-number">3</span>)
+    xk_out = torch.<span class="code-syntax-func">view_as_real</span>(xk_complex * freqs_cis).<span class="code-syntax-func">flatten</span>(<span class="code-syntax-number">3</span>)
+    <span class="code-syntax-keyword">return</span> xq_out.<span class="code-syntax-func">type_as</span>(xq), xk_out.<span class="code-syntax-func">type_as</span>(xk)`
+            },
+            {
+                id: 2,
+                title: "Root Mean Square Norm (RMSNorm) & SwiGLU FFN",
+                filepath: "src/model/layers.py",
+                tensorShape: "x: [B, T, D] -> FFN: [B, T, D]",
+                badge: "Normalization & Gating",
+                badgeClass: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50",
+                desc: "Modern LLMs utilize RMSNorm prior to sub-layers, eliminating mean-centering for lower computational overhead. The Feed-Forward Network employs SwiGLU (Swish Gated Linear Unit), using a dual up/gate projection mechanism that scales features dynamically via self-gating.",
+                code: `<span class="code-syntax-keyword">import</span> torch
+<span class="code-syntax-keyword">import</span> torch.nn <span class="code-syntax-keyword">as</span> nn
+<span class="code-syntax-keyword">import</span> torch.nn.functional <span class="code-syntax-keyword">as</span> F
+
+<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">RMSNorm</span>(nn.Module):
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, dim: <span class="code-syntax-class">int</span>, eps: <span class="code-syntax-class">float</span> = <span class="code-syntax-number">1e-6</span>):
+        <span class="code-syntax-class">super</span>().<span class="code-syntax-func">__init__</span>()
+        self.eps = eps
+        self.weight = nn.<span class="code-syntax-class">Parameter</span>(torch.<span class="code-syntax-func">ones</span>(dim))
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">forward</span>(self, x: torch.Tensor) -> torch.Tensor:
+        <span class="code-syntax-comment"># Standard RMSNorm: normalize solely by root mean square statistic</span>
+        var = torch.<span class="code-syntax-func">mean</span>(x ** <span class="code-syntax-number">2</span>, dim=-<span class="code-syntax-number">1</span>, keepdim=<span class="code-syntax-number">True</span>)
+        <span class="code-syntax-keyword">return</span> x * torch.<span class="code-syntax-func">rsqrt</span>(var + self.eps) * self.weight
+
+<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">SwiGLU</span>(nn.Module):
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, dim: <span class="code-syntax-class">int</span>, hidden_dim: <span class="code-syntax-class">int</span>):
+        <span class="code-syntax-class">super</span>().<span class="code-syntax-func">__init__</span>()
+        <span class="code-syntax-comment"># Scale hidden dimension using 8/3 parameter parity scaling</span>
+        hidden_dim = <span class="code-syntax-class">int</span>(<span class="code-syntax-number">2</span> * hidden_dim / <span class="code-syntax-number">3</span>)
+        self.w1 = nn.<span class="code-syntax-func">Linear</span>(dim, hidden_dim, bias=<span class="code-syntax-number">False</span>)  <span class="code-syntax-comment"># Gate</span>
+        self.w2 = nn.<span class="code-syntax-func">Linear</span>(hidden_dim, dim, bias=<span class="code-syntax-number">False</span>)  <span class="code-syntax-comment"># Down</span>
+        self.w3 = nn.<span class="code-syntax-func">Linear</span>(dim, hidden_dim, bias=<span class="code-syntax-number">False</span>)  <span class="code-syntax-comment"># Up</span>
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">forward</span>(self, x: torch.Tensor) -> torch.Tensor:
+        <span class="code-syntax-comment"># Swish(w1(x)) * w3(x) -> Project Down with w2</span>
+        <span class="code-syntax-keyword">return</span> self.w2(F.<span class="code-syntax-func">silu</span>(self.w1(x)) * self.w3(x))`
+            },
+            {
+                id: 3,
+                title: "Grouped Query Attention & FlashAttention-2",
+                filepath: "src/model/attention.py",
+                tensorShape: "Q:[B, T, H_q, D] | KV:[B, T, H_kv, D]",
+                badge: "Attention Subsystem",
+                badgeClass: "bg-amber-900/60 text-amber-300 border-amber-700/50",
+                desc: "Grouped Query Attention (GQA) reduces KV memory pressure by sharing KV heads across Query head groups. FlashAttention-2 bypasses quadratic HBM read/write overhead by tiling Q, K, V matrices into fast on-chip SRAM blocks and computing Softmax online.",
+                code: `<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">GroupedQueryAttention</span>(nn.Module):
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, args):
+        <span class="code-syntax-class">super</span>().<span class="code-syntax-func">__init__</span>()
+        self.n_heads = args.n_heads
+        self.n_kv_heads = args.n_kv_heads
+        self.n_rep = self.n_heads // self.n_kv_heads
+        self.head_dim = args.dim // args.n_heads
+
+        self.wq = nn.<span class="code-syntax-func">Linear</span>(args.dim, args.n_heads * self.head_dim, bias=<span class="code-syntax-number">False</span>)
+        self.wk = nn.<span class="code-syntax-func">Linear</span>(args.dim, self.n_kv_heads * self.head_dim, bias=<span class="code-syntax-number">False</span>)
+        self.wv = nn.<span class="code-syntax-func">Linear</span>(args.dim, self.n_kv_heads * self.head_dim, bias=<span class="code-syntax-number">False</span>)
+        self.wo = nn.<span class="code-syntax-func">Linear</span>(args.n_heads * self.head_dim, args.dim, bias=<span class="code-syntax-number">False</span>)
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">forward</span>(self, x, freqs_cis):
+        B, S, _ = x.shape
+        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+
+        xq = xq.<span class="code-syntax-func">view</span>(B, S, self.n_heads, self.head_dim)
+        xk = xk.<span class="code-syntax-func">view</span>(B, S, self.n_kv_heads, self.head_dim)
+        xv = xv.<span class="code-syntax-func">view</span>(B, S, self.n_kv_heads, self.head_dim)
+
+        xq, xk = <span class="code-syntax-func">apply_rotary_emb</span>(xq, xk, freqs_cis)
+
+        <span class="code-syntax-comment"># Expand Key/Value heads to match Query head count</span>
+        keys = torch.<span class="code-syntax-func">repeat_interleave</span>(xk, dim=<span class="code-syntax-number">2</span>, repeats=self.n_rep)
+        values = torch.<span class="code-syntax-func">repeat_interleave</span>(xv, dim=<span class="code-syntax-number">2</span>, repeats=self.n_rep)
+
+        <span class="code-syntax-comment"># Trigger Hardware-Fused FlashAttention Kernel</span>
+        output = F.<span class="code-syntax-func">scaled_dot_product_attention</span>(
+            xq.<span class="code-syntax-func">transpose</span>(<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>), 
+            keys.<span class="code-syntax-func">transpose</span>(<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>), 
+            values.<span class="code-syntax-func">transpose</span>(<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>), 
+            is_causal=<span class="code-syntax-number">True</span>
+        )
+        <span class="code-syntax-keyword">return</span> self.wo(output.<span class="code-syntax-func">transpose</span>(<span class="code-syntax-number">1</span>, <span class="code-syntax-number">2</span>).<span class="code-syntax-func">contiguous</span>().<span class="code-syntax-func">view</span>(B, S, -<span class="code-syntax-number">1</span>))`
+            },
+            {
+                id: 4,
+                title: "Training Optimization, Autograd & GPU Profiler",
+                filepath: "src/training/trainer.py",
+                tensorShape: "Logits: [B*T, Vocab] -> Loss: Scalar",
+                badge: "Training & Hardware",
+                badgeClass: "bg-rose-900/60 text-rose-300 border-rose-700/50",
+                desc: "Training requires strict GPU memory accounting. VRAM is consumed by static Model Weights, Gradients, AdamW FP32 Optimizer States, and Dynamic Activation Tensors. `torch.compile` fuses operations into Triton GPU kernels to eliminate HBM bandwidth bottlenecks.",
+                code: `<span class="code-syntax-keyword">def</span> <span class="code-syntax-func">train_step</span>(model, x, y, optimizer, scaler):
+    optimizer.<span class="code-syntax-func">zero_grad</span>(set_to_none=<span class="code-syntax-number">True</span>)
+    
+    <span class="code-syntax-comment"># Forward Pass with Automatic Mixed Precision (bfloat16)</span>
+    <span class="code-syntax-keyword">with</span> torch.autocast(device_type=<span class="code-syntax-string">'cuda'</span>, dtype=torch.bfloat16):
+        logits = model(x)  <span class="code-syntax-comment"># [Batch, Seq_Len, Vocab_Size]</span>
+        loss = F.<span class="code-syntax-func">cross_entropy</span>(
+            logits.<span class="code-syntax-func">view</span>(-<span class="code-syntax-number">1</span>, logits.size(-<span class="code-syntax-number">1</span>)), 
+            y.<span class="code-syntax-func">view</span>(-<span class="code-syntax-number">1</span>), 
+            ignore_index=-<span class="code-syntax-number">1</span>
+        )
+    
+    <span class="code-syntax-comment"># Backward Pass (Autograd traversing dynamic compute graph)</span>
+    scaler.<span class="code-syntax-func">scale</span>(loss).<span class="code-syntax-func">backward</span>()
+    
+    <span class="code-syntax-comment"># Gradient Norm Clipping to prevent exploding gradients</span>
+    scaler.<span class="code-syntax-func">unscale_</span>(optimizer)
+    torch.nn.utils.<span class="code-syntax-func">clip_grad_norm_</span>(model.<span class="code-syntax-func">parameters</span>(), max_norm=<span class="code-syntax-number">1.0</span>)
+    
+    scaler.<span class="code-syntax-func">step</span>(optimizer)
+    scaler.<span class="code-syntax-func">update</span>()
+    <span class="code-syntax-keyword">return</span> loss.<span class="code-syntax-func">item</span>()
+
+<span class="code-syntax-comment"># High-throughput Execution via Kernel Fusion</span>
+compiled_model = torch.<span class="code-syntax-func">compile</span>(model, backend=<span class="code-syntax-string">"inductor"</span>)`
+            },
+            {
+                id: 5,
+                title: "Model Persistence & Autoregressive KV-Cache Inference",
+                filepath: "src/inference/generator.py",
+                tensorShape: "Token Step: [B, 1] -> Cache: [B, H_kv, S, D]",
+                badge: "Inference & Serving",
+                badgeClass: "bg-indigo-900/60 text-indigo-300 border-indigo-700/50",
+                desc: "Inference consists of a Pre-fill Phase (prompt token matrix) and a Decode Phase (generating 1 token at a time). Recomputing historical Keys and Values is prevented via a KV-Cache, turning $O(N^2)$ inference steps into an $O(1)$ dynamic update per step.",
+                code: `<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">KVCacheManager</span>:
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, max_batch, max_seq, n_kv_heads, head_dim):
+        cache_shape = (max_batch, max_seq, n_kv_heads, head_dim)
+        self.k_cache = torch.<span class="code-syntax-func">zeros</span>(cache_shape, dtype=torch.bfloat16, device=<span class="code-syntax-string">'cuda'</span>)
+        self.v_cache = torch.<span class="code-syntax-func">zeros</span>(cache_shape, dtype=torch.bfloat16, device=<span class="code-syntax-string">'cuda'</span>)
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">update</span>(self, start_pos, xk, xv):
+        seq_len = xk.size(<span class="code-syntax-number">1</span>)
+        self.k_cache[:, start_pos : start_pos + seq_len] = xk
+        self.v_cache[:, start_pos : start_pos + seq_len] = xv
+        <span class="code-syntax-keyword">return</span> self.k_cache[:, : start_pos + seq_len], self.v_cache[:, : start_pos + seq_len]
+
+<span class="code-syntax-annotation">@torch.inference_mode</span>()
+<span class="code-syntax-keyword">def</span> <span class="code-syntax-func">generate_autoregressive</span>(model, prompt_tokens, max_new_tokens):
+    tokens = prompt_tokens
+    <span class="code-syntax-keyword">for</span> pos <span class="code-syntax-keyword">in</span> <span class="code-syntax-class">range</span>(<span class="code-syntax-class">len</span>(prompt_tokens), <span class="code-syntax-class">len</span>(prompt_tokens) + max_new_tokens):
+        logits = model(tokens[:, -<span class="code-syntax-number">1</span>:], start_pos=pos)  <span class="code-syntax-comment"># Single token feed</span>
+        next_token = torch.<span class="code-syntax-func">argmax</span>(logits[:, -<span class="code-syntax-number">1</span>, :], dim=-<span class="code-syntax-number">1</span>, keepdim=<span class="code-syntax-number">True</span>)
+        tokens = torch.<span class="code-syntax-func">cat</span>([tokens, next_token], dim=<span class="code-syntax-number">1</span>)
+    <span class="code-syntax-keyword">return</span> tokens`
+            },
+            {
+                id: 6,
+                title: "Complete End-to-End LLM Transformer Assembly",
+                filepath: "src/model/transformer.py",
+                tensorShape: "Tokens: [B, T] -> Unembed Logits: [B, T, Vocab]",
+                badge: "Architecture Spec",
+                badgeClass: "bg-cyan-900/60 text-cyan-300 border-cyan-700/50",
+                desc: "The full standard LLaMA-style decoder transformer architecture stacks RMSNorm, Grouped Query Attention with FlashAttention-2, SwiGLU FFN blocks, and RoPE positional encodings into a single cohesive end-to-end network.",
+                code: `<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">TransformerBlock</span>(nn.Module):
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, args):
+        <span class="code-syntax-class">super</span>().<span class="code-syntax-func">__init__</span>()
+        self.attention = <span class="code-syntax-class">GroupedQueryAttention</span>(args)
+        self.feed_forward = <span class="code-syntax-class">SwiGLU</span>(args.dim, args.dim * <span class="code-syntax-number">4</span>)
+        self.attention_norm = <span class="code-syntax-class">RMSNorm</span>(args.dim, eps=args.norm_eps)
+        self.ffn_norm = <span class="code-syntax-class">RMSNorm</span>(args.dim, eps=args.norm_eps)
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">forward</span>(self, x, freqs_cis):
+        <span class="code-syntax-comment"># Residual connections wrapping Pre-RMSNorm blocks</span>
+        h = x + self.attention(self.attention_norm(x), freqs_cis)
+        out = h + self.feed_forward(self.ffn_norm(h))
+        <span class="code-syntax-keyword">return</span> out
+
+<span class="code-syntax-keyword">class</span> <span class="code-syntax-class">LlamaTransformer</span>(nn.Module):
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">__init__</span>(self, args):
+        <span class="code-syntax-class">super</span>().<span class="code-syntax-func">__init__</span>()
+        self.tok_embeddings = nn.<span class="code-syntax-class">Embedding</span>(args.vocab_size, args.dim)
+        self.layers = nn.<span class="code-syntax-class">ModuleList</span>([<span class="code-syntax-class">TransformerBlock</span>(args) <span class="code-syntax-keyword">for</span> _ <span class="code-syntax-keyword">in</span> <span class="code-syntax-class">range</span>(args.n_layers)])
+        self.norm = <span class="code-syntax-class">RMSNorm</span>(args.dim, eps=args.norm_eps)
+        self.output = nn.<span class="code-syntax-func">Linear</span>(args.dim, args.vocab_size, bias=<span class="code-syntax-number">False</span>)
+        self.freqs_cis = <span class="code-syntax-func">precompute_freqs_cis</span>(args.dim // args.n_heads, args.max_seq_len)
+
+    <span class="code-syntax-keyword">def</span> <span class="code-syntax-func">forward</span>(self, tokens: torch.Tensor):
+        _ , seq_len = tokens.shape
+        h = self.tok_embeddings(tokens)
+        freqs_cis = self.freqs_cis[:seq_len].to(h.device)
+        
+        <span class="code-syntax-keyword">for</span> layer <span class="code-syntax-keyword">in</span> self.layers:
+            h = layer(h, freqs_cis)
+            
+        <span class="code-syntax-keyword">return</span> self.output(self.norm(h))`
+            }
+        ];
+
+        let currentModuleIndex = 0;
+        let vramChartInstance = null;
+
+        // Module Selection Controller
+        function selectModule(index) {
+            currentModuleIndex = index;
+            const data = moduleData[index];
+
+            // Update Active Tab Styling
+            for (let i = 0; i < moduleData.length; i++) {
+                const btn = document.getElementById(`nav-btn-${i}`);
+                if (i === index) {
+                    btn.className = "w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 active-tab font-medium";
+                } else {
+                    btn.className = "w-full text-left px-3 py-2.5 rounded-md transition flex items-center space-x-2 text-gray-300 hover:bg-brand-card font-medium";
+                }
+            }
+
+            // Update UI Labels
+            document.getElementById('code-filepath-label').textContent = data.filepath;
+            document.getElementById('code-container').innerHTML = `<pre class="leading-relaxed"><code>${data.code}</code></pre>`;
+            document.getElementById('section-title').textContent = data.title;
+            document.getElementById('section-desc').textContent = data.desc;
+            document.getElementById('section-tensor-shape').textContent = `Tensor Spec: ${data.tensorShape}`;
+            
+            const badgeEl = document.getElementById('section-badge');
+            badgeEl.textContent = `${data.badge}`;
+            badgeEl.className = `px-2.5 py-0.5 rounded text-xs font-semibold ${data.badgeClass}`;
+
+            // Render Corresponding Visual Workbench Tool
+            renderWorkbench(index);
+        }
+
+        // Workbench Interactive Renderer
+        function renderWorkbench(index) {
+            const container = document.getElementById('visual-workbench');
+            container.innerHTML = ''; // Reset Workbench Container
+
+            if (index === 0) {
+                // Interactive Tokenizer & Sliding Window Tool
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <label class="text-xs font-semibold text-gray-300 block">Interactive Corpus Text Ingestion</label>
+                        <textarea id="tokenizer-input" rows="2" class="w-full bg-brand-bg border border-brand-border rounded p-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-indigo-500" placeholder="Type text corpus here...">Large Language Models learn distributions of natural text tokens.</textarea>
+                        
+                        <div class="flex items-center justify-between text-xs text-gray-400">
+                            <span>Block Size / Window ($T$): <strong id="block-size-val" class="text-indigo-400 font-mono">6</strong></span>
+                            <input type="range" id="block-size-slider" min="3" max="12" value="6" oninput="updateTokenizerSim()" class="w-1/2">
+                        </div>
+                    </div>
+
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="text-xs font-semibold text-gray-300 flex justify-between">
+                            <span>Token ID Encoding Matrix</span>
+                            <span class="text-gray-400 font-mono text-2xs">Vocabulary Map Size: 256</span>
+                        </div>
+                        <div id="token-chips" class="flex flex-wrap gap-1.5 font-mono text-2xs">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="text-xs font-semibold text-gray-300">Causal Sliding Window Sampling ($X \to Y$)</div>
+                        <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+                            <div class="bg-brand-bg p-2.5 rounded border border-indigo-900/50">
+                                <span class="text-indigo-400 font-bold block mb-1">Context Window Tensor (X)</span>
+                                <div id="tensor-x-display" class="text-gray-300 space-y-1"></div>
+                            </div>
+                            <div class="bg-brand-bg p-2.5 rounded border border-emerald-900/50">
+                                <span class="text-emerald-400 font-bold block mb-1">Target Window Tensor (Y)</span>
+                                <div id="tensor-y-display" class="text-gray-300 space-y-1"></div>
+                            </div>
+                        </div>
+                        <p class="text-2xs text-gray-400 italic">Target tensor Y is strictly shifted +1 index to the right. Cross-entropy computes prediction loss for each step in parallel.</p>
+                    </div>
+                `;
+                updateTokenizerSim();
+            } 
+            else if (index === 1) {
+                // RoPE 2D Complex Rotation Visualizer
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-gray-300">Rotary Vector Rotation Visualizer</span>
+                            <span class="text-xs font-mono text-indigo-400">Complex Plane $\\mathbb{C}$</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <label class="text-gray-400 block text-2xs mb-1">Token Position $m$: <strong id="pos-m-val" class="text-cyan-400 font-mono">2</strong></label>
+                                <input type="range" id="pos-m-slider" min="0" max="10" value="2" oninput="drawRopeCanvas()" class="w-full">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 block text-2xs mb-1">Dim Pair Index $i$: <strong id="dim-i-val" class="text-emerald-400 font-mono">0</strong></label>
+                                <input type="range" id="dim-i-slider" min="0" max="3" value="0" oninput="drawRopeCanvas()" class="w-full">
+                            </div>
+                        </div>
+                        <div class="flex justify-center bg-brand-bg p-2 rounded border border-brand-border">
+                            <canvas id="rope-canvas" width="280" height="200"></canvas>
+                        </div>
+                        <div id="rope-math-output" class="text-2xs font-mono bg-brand-bg p-2 rounded border border-brand-border text-gray-300">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                `;
+                drawRopeCanvas();
+            }
+            else if (index === 2) {
+                // RMSNorm & SwiGLU Activation Curves
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-gray-300">Activation Function Dynamics: SiLU (Swish)</span>
+                            <span class="text-2xs font-mono text-emerald-400">$f(x) = x \\cdot \\sigma(x)$</span>
+                        </div>
+                        <div class="flex justify-center bg-brand-bg p-2 rounded border border-brand-border">
+                            <canvas id="swiglu-canvas" width="320" height="180"></canvas>
+                        </div>
+                        <div class="text-2xs text-gray-400 leading-relaxed">
+                            Unlike ReLU which completely zeroes negative inputs, SiLU presents a smooth non-monotonic curve allowing small negative gradients to flow back, preventing dead neurons during deep parameter optimization.
+                        </div>
+                    </div>
+
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-2 text-xs">
+                        <span class="font-semibold text-gray-300 block">RMSNorm vs LayerNorm Computational Efficiency</span>
+                        <div class="grid grid-cols-2 gap-2 text-2xs">
+                            <div class="bg-brand-bg p-2 rounded border border-brand-border">
+                                <span class="text-indigo-400 font-bold block">Standard LayerNorm</span>
+                                <span class="text-gray-400 font-mono">y = (x - μ) / √(σ² + ε) * γ + β</span>
+                                <p class="mt-1 text-gray-500">Requires calculating both mean μ and variance σ² across feature dimensions.</p>
+                            </div>
+                            <div class="bg-brand-bg p-2 rounded border border-brand-border">
+                                <span class="text-emerald-400 font-bold block">RMSNorm (LLaMA Spec)</span>
+                                <span class="text-gray-400 font-mono">y = x / RMS(x) * γ</span>
+                                <p class="mt-1 text-gray-500">Omits mean calculation and offset bias β, reducing memory bandwidth overhead by ~30%.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                drawSwigluCanvas();
+            }
+            else if (index === 3) {
+                // GQA Topology & Attention Heatmap Visualizer
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-gray-300">Grouped Query Attention (GQA) Topology</span>
+                            <span class="text-2xs font-mono text-amber-400">Ratio: 4 Q-Heads : 1 KV-Head</span>
+                        </div>
+                        <div class="flex justify-center bg-brand-bg p-3 rounded border border-brand-border">
+                            <canvas id="gqa-canvas" width="340" height="150"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-gray-300">Causal Attention Score Matrix Map</span>
+                            <span class="text-2xs font-mono text-gray-400">Lower Triangular Mask</span>
+                        </div>
+                        <div class="flex justify-center bg-brand-bg p-2 rounded border border-brand-border">
+                            <canvas id="attention-map-canvas" width="220" height="180"></canvas>
+                        </div>
+                        <p class="text-2xs text-gray-400 italic">FlashAttention-2 computes this softmax online using tiling without materializing the $N \\times N$ matrix in high-bandwidth memory (HBM).</p>
+                    </div>
+                `;
+                drawGqaCanvas();
+                drawAttentionMap();
+            }
+            else if (index === 4) {
+                // Real-Time GPU VRAM Profiler & Hyperparameter Calculator
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <span class="text-xs font-semibold text-gray-300 block">Real-Time GPU VRAM Footprint Profiler</span>
+                        
+                        <div class="grid grid-cols-2 gap-3 text-2xs">
+                            <div>
+                                <label class="text-gray-400 block mb-1">Model Parameters ($P$): <strong id="vram-params-val" class="text-indigo-400 font-mono">7B</strong></label>
+                                <input type="range" id="vram-params-slider" min="1" max="70" value="7" oninput="updateVramCalculator()" class="w-full">
+                            </div>
+                            <div>
+                                <label class="text-gray-400 block mb-1">Context Length ($T$): <strong id="vram-seq-val" class="text-cyan-400 font-mono">4096</strong></label>
+                                <input type="range" id="vram-seq-slider" min="1024" max="32768" step="1024" value="4096" oninput="updateVramCalculator()" class="w-full">
+                            </div>
+                        </div>
+
+                        <!-- Chart Container Wrapper -->
+                        <div class="chart-container">
+                            <canvas id="vramChart"></canvas>
+                        </div>
+
+                        <div id="vram-breakdown-stats" class="grid grid-cols-3 gap-2 text-2xs font-mono bg-brand-bg p-2 rounded border border-brand-border text-center">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                `;
+                initVramChart();
+            }
+            else if (index === 5) {
+                // Autoregressive KV-Cache Generation Step Simulator
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-gray-300">KV-Cache Autoregressive Step Simulator</span>
+                            <button onclick="stepKVCacheSim()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-2xs font-mono transition">
+                                ▶ Step Next Token
+                            </button>
+                        </div>
+
+                        <div class="bg-brand-bg p-3 rounded border border-brand-border space-y-2">
+                            <div class="text-2xs font-mono text-gray-400">Generated Sequence Output:</div>
+                            <div id="kv-generated-text" class="text-xs font-mono text-emerald-400 font-semibold min-h-[32px]">
+                                Prompt: [The architecture of]
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-2xs font-mono text-gray-400">
+                                <span>Cached Keys/Values Array Buffer:</span>
+                                <span id="kv-buffer-status" class="text-cyan-400">3 Tokens Cached</span>
+                            </div>
+                            <div id="kv-buffer-visual" class="flex gap-1 overflow-x-auto py-1">
+                                <!-- Dynamic Chips -->
+                            </div>
+                        </div>
+
+                        <p class="text-2xs text-gray-400">During decode, only the single incoming query vector interacts with the historically stored KV tensors, maintaining constant $O(1)$ iteration times.</p>
+                    </div>
+                `;
+                resetKVSim();
+            }
+            else if (index === 6) {
+                // Architecture Summary Module
+                container.innerHTML = `
+                    <div class="bg-brand-card border border-brand-border rounded-lg p-4 space-y-3 text-xs">
+                        <span class="font-semibold text-gray-300 block">LLaMA Architecture Execution Summary</span>
+                        
+                        <div class="space-y-2 text-2xs text-gray-400">
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>1. Token Input Embedding</span>
+                                <span class="font-mono text-indigo-400">[Batch, Seq_Len, Dim]</span>
+                            </div>
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>2. Pre-RMSNorm Scaling</span>
+                                <span class="font-mono text-cyan-400">Invariant Mean Square Norm</span>
+                            </div>
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>3. Rotary Positional Rotation (RoPE)</span>
+                                <span class="font-mono text-emerald-400">Complex Angle Multiplication</span>
+                            </div>
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>4. Grouped Query FlashAttention-2</span>
+                                <span class="font-mono text-amber-400">GQA + SRAM Tiled Softmax</span>
+                            </div>
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>5. SwiGLU Gated Feed-Forward Network</span>
+                                <span class="font-mono text-rose-400">8/3 Hidden Expansion Ratio</span>
+                            </div>
+                            <div class="p-2 bg-brand-bg rounded border border-brand-border flex items-center justify-between">
+                                <span>6. Final LayerNorm & Unembedding Projection</span>
+                                <span class="font-mono text-indigo-400">[Batch, Seq_Len, Vocab_Size]</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // --- Interactive Simulation Logic ---
+
+        // Module 01: Tokenizer Simulator
+        function updateTokenizerSim() {
+            const text = document.getElementById('tokenizer-input').value;
+            const blockSize = parseInt(document.getElementById('block-size-slider').value);
+            document.getElementById('block-size-val').textContent = blockSize;
+
+            // Generate integer ASCII/Subword character codes
+            const tokenIds = Array.from(text).map(c => c.charCodeAt(0) % 100);
+            
+            const chipsContainer = document.getElementById('token-chips');
+            chipsContainer.innerHTML = tokenIds.map((id, idx) => `
+                <span class="bg-brand-bg border border-brand-border px-1.5 py-0.5 rounded text-gray-300">
+                    '<span class="text-cyan-400">${text[idx] === ' ' ? '␣' : text[idx]}</span>':<span class="text-indigo-400 font-bold">${id}</span>
+                </span>
+            `).join('');
+
+            // Context (X) vs Target (Y) Windows
+            const xVal = tokenIds.slice(0, blockSize);
+            const yVal = tokenIds.slice(1, blockSize + 1);
+
+            document.getElementById('tensor-x-display').innerHTML = `X = [${xVal.join(', ')}]`;
+            document.getElementById('tensor-y-display').innerHTML = `Y = [${yVal.join(', ')}]`;
+        }
+
+        // Module 02: RoPE Rotation Canvas
+        function drawRopeCanvas() {
+            const m = parseInt(document.getElementById('pos-m-slider').value);
+            const i = parseInt(document.getElementById('dim-i-slider').value);
+            document.getElementById('pos-m-val').textContent = m;
+            document.getElementById('dim-i-val').textContent = i;
+
+            const canvas = document.getElementById('rope-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 60;
+
+            // Draw Coordinate Axes
+            ctx.strokeStyle = '#374151';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 80, centerY); ctx.lineTo(centerX + 80, centerY);
+            ctx.moveTo(centerX, centerY - 80); ctx.lineTo(centerX, centerY + 80);
+            ctx.stroke();
+
+            // Draw Unit Circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#4B5563';
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Calculate Theta Angle: theta = m / (10000 ^ (2i / dim))
+            const theta = m / Math.pow(10, i * 0.5);
+            const vecX = centerX + radius * Math.cos(-theta);
+            const vecY = centerY + radius * Math.sin(-theta);
+
+            // Draw Rotated Vector
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(vecX, vecY);
+            ctx.strokeStyle = '#6366F1';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Vector Point
+            ctx.beginPath();
+            ctx.arc(vecX, vecY, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#06B6D4';
+            ctx.fill();
+
+            document.getElementById('rope-math-output').innerHTML = `
+                Rotation Angle θ = pos(${m}) × freq(${i}) = ${theta.toFixed(4)} rad<br>
+                Complex Representation: e^(iθ) = ${(Math.cos(theta)).toFixed(3)} + ${(Math.sin(theta)).toFixed(3)}i
+            `;
+        }
+
+        // Module 03: SwiGLU Activation Canvas
+        function drawSwigluCanvas() {
+            const canvas = document.getElementById('swiglu-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Draw Axes
+            ctx.strokeStyle = '#374151';
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+            ctx.moveTo(w / 2, 0); ctx.lineTo(w, h / 2); ctx.lineTo(w / 2, h);
+            ctx.stroke();
+
+            // Plot SiLU curve: f(x) = x / (1 + exp(-x))
+            ctx.beginPath();
+            ctx.strokeStyle = '#10B981';
+            ctx.lineWidth = 2;
+
+            for (let px = 0; px < w; px++) {
+                const x = (px - w / 2) / 25;
+                const silu = x / (1 + Math.exp(-x));
+                const py = h / 2 - silu * 25;
+                if (px === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        }
+
+        // Module 04: GQA Topology Canvas
+        function drawGqaCanvas() {
+            const canvas = document.getElementById('gqa-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Query Heads (8 Left) -> Key/Value Heads (2 Right)
+            const qCount = 8;
+            const kvCount = 2;
+
+            // Query Nodes
+            for (let i = 0; i < qCount; i++) {
+                const y = 15 + i * 16;
+                ctx.beginPath();
+                ctx.arc(40, y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#6366F1';
+                ctx.fill();
+
+                // Connect to grouped KV Head
+                const kvIdx = Math.floor(i / (qCount / kvCount));
+                const kvY = 35 + kvIdx * 65;
+
+                ctx.beginPath();
+                ctx.moveTo(45, y);
+                ctx.lineTo(280, kvY);
+                ctx.strokeStyle = '#374151';
+                ctx.stroke();
+            }
+
+            // KV Nodes
+            for (let j = 0; j < kvCount; j++) {
+                const y = 35 + j * 65;
+                ctx.beginPath();
+                ctx.arc(280, y, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#F59E0B';
+                ctx.fill();
+                ctx.fillStyle = '#111827';
+                ctx.font = '9px monospace';
+                ctx.fillText(`KV_${j}`, 273, y + 3);
+            }
+        }
+
+        function drawAttentionMap() {
+            const canvas = document.getElementById('attention-map-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const size = 6;
+            const cellSize = 25;
+            const startX = 35;
+            const startY = 15;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    ctx.beginPath();
+                    ctx.rect(startX + c * cellSize, startY + r * cellSize, cellSize - 2, cellSize - 2);
+                    
+                    if (c <= r) {
+                        // Causal lower triangular active scores
+                        const intensity = Math.floor(100 + Math.random() * 155);
+                        ctx.fillStyle = `rgb(99, 102, ${intensity})`;
+                    } else {
+                        // Masked Future Tokens (-inf)
+                        ctx.fillStyle = '#1F2937';
+                    }
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Module 05: VRAM Calculator & Chart
+        function updateVramCalculator() {
+            const paramsB = parseFloat(document.getElementById('vram-params-slider').value);
+            const seqLen = parseInt(document.getElementById('vram-seq-slider').value);
+            
+            document.getElementById('vram-params-val').textContent = `${paramsB}B`;
+            document.getElementById('vram-seq-val').textContent = seqLen;
+
+            // Calculations in GB (bfloat16 precision = 2 bytes/param)
+            const weightMem = paramsB * 2; // bfloat16
+            const gradMem = paramsB * 2;   // bfloat16
+            const optMem = paramsB * 8;    // AdamW FP32 (4 bytes momentum + 4 bytes variance)
+            
+            // KV Cache Memory (Batch=1, Layers=32, Heads=8, HeadDim=128)
+            const kvMem = (2 * 1 * 32 * 8 * 128 * seqLen * 2) / 1e9;
+
+            if (vramChartInstance) {
+                vramChartInstance.data.datasets[0].data = [weightMem, gradMem, optMem, kvMem];
+                vramChartInstance.update();
+            }
+
+            document.getElementById('vram-breakdown-stats').innerHTML = `
+                <div><span class="text-gray-400 block">Weights:</span><strong class="text-indigo-400">${weightMem.toFixed(1)} GB</strong></div>
+                <div><span class="text-gray-400 block">AdamW States:</span><strong class="text-rose-400">${optMem.toFixed(1)} GB</strong></div>
+                <div><span class="text-gray-400 block">KV Cache:</span><strong class="text-cyan-400">${kvMem.toFixed(2)} GB</strong></div>
+            `;
+        }
+
+        function initVramChart() {
+            const ctx = document.getElementById('vramChart');
+            if (!ctx) return;
+
+            if (vramChartInstance) vramChartInstance.destroy();
+
+            vramChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Model Weights', 'Gradients', 'AdamW States', 'KV Cache'],
+                    datasets: [{
+                        label: 'VRAM Usage (GB)',
+                        data: [14, 14, 56, 0.5],
+                        backgroundColor: ['#6366F1', '#F59E0B', '#F43F5E', '#06B6D4'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9CA3AF', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#9CA3AF', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            updateVramCalculator();
+        }
+
+        // Module 06: KV Cache Generation Simulator
+        const simTokens = ["The", " architecture", " of", " modern", " LLMs", " utilizes", " FlashAttention", " kernels."];
+        let simStep = 3;
+
+        function resetKVSim() {
+            simStep = 3;
+            renderKVSimUI();
+        }
+
+        function stepKVCacheSim() {
+            if (simStep < simTokens.length) {
+                simStep++;
+                renderKVSimUI();
+            }
+        }
+
+        function renderKVSimUI() {
+            const generatedSlice = simTokens.slice(0, simStep).join("");
+            document.getElementById('kv-generated-text').textContent = `Output: ${generatedSlice}`;
+            document.getElementById('kv-buffer-status').textContent = `${simStep} Tokens Cached in VRAM`;
+
+            const bufferVisual = document.getElementById('kv-buffer-visual');
+            bufferVisual.innerHTML = simTokens.slice(0, simStep).map((tok, i) => `
+                <div class="bg-brand-bg border border-indigo-500/50 px-2 py-1 rounded text-2xs font-mono text-cyan-300 shrink-0">
+                    <span class="text-gray-500 block text-[9px]">Pos ${i}</span>
+                    K,V [${tok}]
+                </div>
+            `).join('');
+        }
+
+        // System Prompt Copy Engine
+        function togglePromptModal(show) {
+            const modal = document.getElementById('prompt-modal');
+            if (show) {
+                document.getElementById('prompt-text-container').textContent = getPromptText();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function copyMasterPrompt() {
+            togglePromptModal(true);
+        }
+
+        function copyMasterPromptText() {
+            navigator.clipboard.writeText(getPromptText());
+            alert("Master Prompt copied to clipboard!");
+        }
+
+        function copyCodeBlock() {
+            const code = moduleData[currentModuleIndex].code.replace(/<[^>]*>?/gm, '');
+            navigator.clipboard.writeText(code);
+            alert("PyTorch code snippet copied to clipboard!");
+        }
+
+        function getPromptText() {
+            return `# Master LLM Engineering & Architecture System Prompt
+
+System Role: Staff Machine Learning Systems Engineer specializing in Large Language Models, PyTorch architecture design, and high-performance CUDA execution.
+
+Context & Target Specs:
+- Architecture Paradigm: Modern Decoder-Only Transformer (LLaMA-3 Spec)
+- Key Modules: RMSNorm, Rotary Positional Embeddings (RoPE), Grouped Query Attention (GQA), Hardware Attention (FlashAttention-2), SwiGLU Feed-Forward Networks.
+
+Execution Instructions:
+1. All PyTorch code blocks MUST be production-ready, fully type-hinted, and commented with exact tensor dimensions at each forward step (e.g., [Batch, Seq_Len, Heads, Head_Dim]).
+2. Prioritize kernel fusion compatibility with \`torch.compile\` (Inductor backend), preventing graph breaks by avoiding dynamic tensor control flows.
+3. Compute precise GPU memory footprints, accounting for Weights, Gradients, AdamW FP32 Optimizer States, and dynamic KV Cache arrays.`;
+        }
+
+        // Initial Load Event
+        window.addEventListener('DOMContentLoaded', () => {
+            selectModule(0);
+        });
+    </script>
+</body>
+</html>
+```
+
+### Key Technical Highlights of this Reference Tool:
+1. **Interactive Dual-Pane Interface:** The left code editor presents clean PyTorch source code for every component (RoPE, GQA, SwiGLU, RMSNorm, KV Cache, and full LLaMA assembly). The right panel provides live mathematical visualizers and interactive tools.
+2. **Interactive Workbench Modules:**
+   - **Corpus Preprocessing & Token Offset Tool:** Adjust window sampling sizes to inspect $X$ context vs $Y$ offset target tensors.
+   - **2D Complex Plane RoPE Visualizer:** Adjust sequence position $m$ and frequency $i$ to view real-time vector rotation on a complex plane canvas.
+   - **RMSNorm & SwiGLU Workbench:** Compare computational efficiency graphs between LayerNorm and RMSNorm, alongside SiLU activation curves.
+   - **GQA Topology & Attention Heatmap:** View interactive Query-to-KV head mappings and causal lower-triangular attention matrices.
+   - **Real-Time GPU VRAM Profiler:** Interactive Chart.js bar chart computing memory allocations across Weights, Gradients, AdamW FP32 optimizer states, and KV Cache buffers.
+   - **Autoregressive KV Cache Simulator:** Step through sequence generation to observe dynamic memory updates in real time.
+3. **Built-in Master AI Prompt:** Includes a dedicated modal exporter containing a detailed system prompt for future engineering tasks.

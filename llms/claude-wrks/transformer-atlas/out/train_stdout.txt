@@ -1,0 +1,22 @@
+device=cpu  params=826,624  V=66  {'path': 'data/input.txt', 'sha256': '86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed', 'chars': 1115394, 'split_chars': [1003854, 55770, 55770], 'unk_in_val': 0}
+step     0 | train 4.2215 | val 4.2221
+step   250 | train 2.3542 | val 2.3621
+step   500 | train 2.0738 | val 2.1238
+step   750 | train 1.8509 | val 1.9498
+step  1000 | train 1.7151 | val 1.8549
+step  1250 | train 1.6197 | val 1.7665
+step  1500 | train 1.5626 | val 1.7193
+step  1750 | train 1.5167 | val 1.6647
+step  2000 | train 1.4803 | val 1.6324
+step  2250 | train 1.4509 | val 1.5962
+step  2500 | train 1.4240 | val 1.5682
+step  2750 | train 1.4043 | val 1.5474
+step  3000 | train 1.3883 | val 1.5368
+step  3250 | train 1.3694 | val 1.5114
+step  3500 | train 1.3583 | val 1.5076
+step  3750 | train 1.3467 | val 1.5030
+step  4000 | train 1.3346 | val 1.4837
+step  4250 | train 1.3280 | val 1.4798
+step  4500 | train 1.3189 | val 1.4769
+step  4750 | train 1.3159 | val 1.4685
+step  5000 | train 1.3116 | val 1.4670

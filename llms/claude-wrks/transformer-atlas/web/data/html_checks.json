@@ -1,0 +1,60 @@
+{
+ "browser": "141.0.7390.37",
+ "items": [
+  {
+   "name": "Page boots and renders",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "All source-code anchors resolve",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Browser engine agrees with PyTorch record",
+   "ok": true,
+   "detail": "worst |\u0394| = 2.73e-06"
+  },
+  {
+   "name": "Every chapter renders and every control runs without errors",
+   "ok": true,
+   "detail": "21 chapters, 131 controls clicked, all ranges/selects/checkboxes exercised"
+  },
+  {
+   "name": "No horizontal page overflow at 1440 px",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Code and visualisation stay synchronised",
+   "ok": true,
+   "detail": "code line \u2192 tensor, tensor \u2192 code line"
+  },
+  {
+   "name": "Editing the running example recomputes dependent results",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Keyboard: chapter keys and search palette",
+   "ok": true,
+   "detail": "] \u2192 win; search results: True"
+  },
+  {
+   "name": "Reduced-motion preference respected",
+   "ok": true,
+   "detail": "scroll-behavior = auto"
+  },
+  {
+   "name": "Phone width (390 px): no page overflow; source/computation switch",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Core content readable without animation",
+   "ok": true,
+   "detail": ""
+  }
+ ]
+}

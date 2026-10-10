@@ -1,0 +1,8 @@
+# Versions used to build, test and record every number in TransformerAtlas.html (Python 3.13, CPU)
+torch==2.14.1
+numpy==2.5.3
+fastapi==0.143.0
+uvicorn==0.53.0
+pydantic==2.13.5
+httpx==0.28.1      # FastAPI TestClient (tests, export_trained.py)
+pytest==9.1.1
